@@ -13,10 +13,16 @@ static unsigned level(void) { return GPIO_PIN(DSP_PORT) >> DSP_LINE & 1u; }
 static unsigned edges, stuck;
 static uint32_t start_polls;                  /* length of the last frame start: 8 units */
 
+#ifndef SPAN_POLL
+#define SPAN_POLL()                           /* something to keep going while the line is watched */
+#endif
+
 static uint32_t span(unsigned lv) {
     uint32_t n = 1;
-    while (level() == lv)
+    while (level() == lv) {
         if (++n > LIMIT) { ++stuck; return 0; }
+        if (!(n & 0x3FFu)) SPAN_POLL();
+    }
     ++edges;
     return n;
 }
@@ -27,6 +33,26 @@ __attribute__((unused)) static void counts(void) {
     text_hex(7, 0, stuck, 2, 3);
 }
 
+/* The n words after a frame start, whose low unit took l polls. 0: the line
+ * is stuck. The low after the very last bit is not waited for: the line stays
+ * low unless another frame follows. */
+static int frame_bits(uint32_t *w, unsigned n, uint32_t l) {
+    uint32_t h;
+    for (unsigned i = 0; i < n; ++i) {
+        w[i] = 0;
+        for (unsigned b = 0; b < 32; ++b) {
+            h = span(1);
+            if (i + 1 < n || b < 31) l = span(0);
+            if (!h || !l) return 0;
+            w[i] = w[i] << 1 | (h > 2 * l);
+        }
+    }
+    return 1;
+}
+
+#define FRAME_START 1500u                     /* polls: a frame start is longer, nam_live's pulses for
+                                               * each sample far shorter */
+
 /* One frame of n words into w. 0: the line is stuck. */
 static int frame_in(uint32_t *w, unsigned n) {
     uint32_t h, l;
@@ -34,15 +60,19 @@ static int frame_in(uint32_t *w, unsigned n) {
     do {
         h = span(1); l = span(0);
         if (!h || !l) return 0;
-    } while (h <= 5 * l);                     /* the 8:1 frame start */
+    } while (h <= 5 * l || h < FRAME_START);  /* the 8:1 frame start */
     start_polls = h;
-    for (unsigned i = 0; i < n; ++i) {
-        w[i] = 0;
-        for (unsigned b = 0; b < 32; ++b) {
-            h = span(1); l = span(0);
-            if (!h || !l) return 0;
-            w[i] = w[i] << 1 | (h > 2 * l);
-        }
-    }
-    return 1;
+    return frame_bits(w, n, l);
+}
+
+/* The same for a frame that was asked for a moment ago, so that its start may
+ * already be on the line. */
+__attribute__((unused)) static int frame_now(uint32_t *w, unsigned n) {
+    uint32_t h, l;
+    if (!span(0)) return 0;
+    do {
+        h = span(1); l = span(0);
+        if (!h || !l) return 0;
+    } while (h <= 5 * l || h < FRAME_START);
+    return frame_bits(w, n, l);
 }

@@ -29,6 +29,7 @@ up on this board.
 | `src/sharc/audio.asm` | the audio hardware from the SHARC: routing, clock generators, codec reset, serial ports |
 | `src/sharc/audio_thru.asm`, `src/smoke_thru.c` | inputs copied to outputs through the codecs (`make smoke-thru`): works on the unit |
 | `src/sharc/nam_live.asm`, `nam_live.py`, `src/smoke_live.c` | the model in the audio path, ports on chained DMA (`make smoke-live`) |
+| `src/pedal.c` | the pedal (`make pedal`): `nam_live.asm`'s chain model -> three-band equaliser -> delay -> level, worked from the front panel; on the unit the program keeps up with every block on |
 | `src/audio_pins.h` | the LPC4350's share of the audio path: bypass relays and the stock start-up pin levels |
 
 NAM A2 on the SHARC. In the simulator (`make sharc-test`; the 8-channel runs
@@ -40,11 +41,11 @@ share of the 450 MHz core at 48 kHz (9,375 cycles a sample):
 |---|---|---|---|---|
 | A2-Lite, 3 channels | `nam_a2.asm` | 5,251 | 56% | 21,150 words |
 | A2-Full, 8 channels | `nam_a2.asm` | 19,756 | 211% | 63,275 words |
-| A2-Full, 8 channels | `nam_a2_simd.asm` | 8,047 | 86% | 63,543 words |
+| A2-Full, 8 channels | `nam_a2_simd.asm` | 7,403 | 79% | 63,500 words |
 
 `nam_a2_simd.asm` uses both processing elements. A2-Full has about 12,100
 multiply-adds a sample, 6,070 cycles at two a cycle (65%); the rest is loop
-set-up, the tap gather and the head. The model fits internal memory:
+set-up and the head. The model fits internal memory:
 `nam_pack.place()` puts the weights and the layer rings, which the kernel
 reads through PM, in blocks 3 and 1, and what it reads through DM in block 2,
 so no instruction reads one block twice. External memory would be far too slow
@@ -64,7 +65,8 @@ Measured, A2-Full, 32 samples from reset:
 | kernel | cycles a sample | share of 48 kHz at 450 MHz | output |
 |---|---|---|---|
 | 1x1 as straight-line code (7,955 instructions) | 9,523 | 102% | equal to the simulator's, bit for bit |
-| 1x1 as loops, the present kernel (8,047 instructions) | 8,954 | 95.5% | equal to the simulator's, bit for bit |
+| 1x1 as loops (8,047 instructions) | 8,954 | 95.5% | equal to the simulator's, bit for bit |
+| taps read in place in the ring, the present kernel (7,403 instructions) | 8,144 | 86.9% | equal to the simulator's, bit for bit |
 
 The simulator counts instructions; the chip takes 11% more cycles with the
 present kernel. An instruction that reads data through PM needs a place in

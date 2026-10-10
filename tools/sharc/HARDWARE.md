@@ -90,6 +90,31 @@ CLKIN is 25 MHz (18 x 25).
 
 Before the PLL: `DM(0x4c20) = 8`, `DM(0x4c00) = 0` (link ports off ?).
 
+## What the pipeline costs (measured, `make smoke-stall`)
+
+`src/sharc/stall_bench.asm` times short pieces of code with the core timer;
+the simulator counts instructions, the unit cycles.
+
+- A counted loop costs one cycle more than its instructions, whatever its
+  length and wherever the count comes from.
+- An index register written by a register move or a load and used in the next
+  instruction costs two cycles, with one instruction between one cycle, with
+  two none.
+- A DM and a PM access to the same memory block in one instruction cost a
+  cycle every time (48 for a loop of 48).
+- Up to nine instructions in a row that read through PM, and three such
+  instructions 16 or 32 addresses apart, cost nothing: the instruction cache
+  was not seen to run out in these tests.
+- Stores through DM and PM in one instruction, in a row, cost nothing.
+
+`nam_a2_simd.asm` for A2-Full runs 7,404 instructions a sample in the
+simulator and 8,143.6 cycles on the unit (output equal bit for bit). Timing
+stretches of it separately on the unit put the 740 lost cycles at about 12 a
+layer in the convolution (3 for each pair of channels) and 15 a layer in the
+1x1 (2 to 5 a pair, 1 for the stores): spread thin, no single cause. Doing the
+1x1's four stores together at the end cost as many instructions as it saved
+cycles.
+
 ## DDR2 (external memory at 0x200000)
 
 In order:

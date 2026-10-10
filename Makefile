@@ -84,9 +84,19 @@ build/sharc_nam_bench.h: $(NAM_MODEL) $(NAM_BENCH) $(SHARC_TOOLS) | build
 	python3 tools/sharc/nam_bench.py $(NAM_MODEL) -c $@ sharc_nam_bench
 smoke-nam: build/firmware-smoke-nam.dfu
 build/firmware-smoke-nam.dfu: src/startup.c src/smoke_nam.c src/smoke_sharc.c src/smoke_lcd.c build/sharc_nam_bench.h | build
-	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/smoke_nam.c -o build/firmware-smoke-nam.elf
+	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/smoke_nam.c src/dfu.c -o build/firmware-smoke-nam.elf
 	$(CROSS)objcopy -O binary build/firmware-smoke-nam.elf build/firmware-smoke-nam.bin
 	python3 src/mkbootimg.py build/firmware-smoke-nam.bin $@
+
+# What the SHARC's pipeline costs: see src/sharc/stall_bench.asm.
+build/sharc_stall.h: src/sharc/stall_bench.asm src/sharc/report.asm src/sharc/kernel.asm tools/sharc/mkreport.py $(SHARC_TOOLS) | build
+	python3 tools/sharc/mkreport.py src/sharc/stall_bench.asm -c $@ sharc_stall
+smoke-stall: build/firmware-smoke-stall.dfu
+build/firmware-smoke-stall.dfu: src/smoke_words.c src/startup.c src/smoke_sharc.c src/smoke_lcd.c src/usb_mon.h build/sharc_stall.h | build
+	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) -DIMG=sharc_stall -DIMG_WORDS=SHARC_STALL_WORDS '-DIMG_H="../build/sharc_stall.h"' \
+	    src/startup.c src/smoke_words.c src/dfu.c -o build/firmware-smoke-stall.elf
+	$(CROSS)objcopy -O binary build/firmware-smoke-stall.elf build/firmware-smoke-stall.bin
+	python3 src/mkbootimg.py build/firmware-smoke-stall.bin $@
 
 # Stage 4: the audio hardware. See src/smoke_audio.c (measure) and src/smoke_thru.c (listen).
 REPORT = src/sharc/kernel.asm src/sharc/report.asm src/sharc/audio.asm tools/sharc/mkreport.py \
@@ -121,11 +131,11 @@ build/firmware-smoke-live.dfu: src/smoke_live.c $(SMOKE_AUDIO) build/sharc_nam_l
 
 # The pedal: the model in the path and a monitor for the controls. See src/pedal.c.
 pedal: build/firmware-pedal.dfu
-build/firmware-pedal.dfu: src/pedal.c src/i2c_poll.h $(SMOKE_AUDIO) build/sharc_nam_live.h | build
-	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/pedal.c src/dfu.c -o build/firmware-pedal.elf
+build/firmware-pedal.dfu: src/pedal.c src/i2c_poll.h src/usb_mon.h $(SMOKE_AUDIO) build/sharc_nam_live.h | build
+	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/pedal.c src/dfu.c -lm -o build/firmware-pedal.elf
 	$(CROSS)objcopy -O binary build/firmware-pedal.elf build/firmware-pedal.bin
 	python3 src/mkbootimg.py build/firmware-pedal.bin $@
 
 clean:
 	rm -rf build
-.PHONY: all backup smoke smoke-bounce smoke-lcd smoke-sharc smoke-nam smoke-audio smoke-thru smoke-live pedal sharc-test clean test
+.PHONY: all backup smoke smoke-bounce smoke-lcd smoke-sharc smoke-nam smoke-stall smoke-audio smoke-thru smoke-live pedal sharc-test clean test

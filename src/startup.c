@@ -24,6 +24,10 @@ void (* const g_vectors[])(void) = {
 };
 
 void Reset_Handler(void) {
+    /* The images are built for the FPU (hard-float): give code access to it
+     * before anything can use it. Without this the first float instruction
+     * faults (seen on the unit: pedal.c stopped at its first number). */
+    *(volatile uint32_t *)0xE000ED88u |= 0xFu << 20;         /* CPACR: CP10, CP11 full access */
     /* copy .data from LMA to RAM */
     for (uint32_t *s = &_sidata, *d = &_sdata; d < &_edata; ) *d++ = *s++;
     /* zero .bss */

@@ -46,7 +46,7 @@ def _layers(w, c, simd):
     if simd and c & 1:
         raise SystemExit("the SIMD layout needs an even channel count")
     o = c                                             # stream offset, after the rechannel weights
-    blocks = []
+    blocks, pres = [], []
     for k in KERNEL:
         conv, o = o, o + c * c * k
         bias, o = o, o + c
@@ -55,11 +55,12 @@ def _layers(w, c, simd):
         b1, o = o, o + c
         rows = [[w[conv + (i * c + j) * k + t] for t in range(k) for j in range(c)] for i in range(c)]
         res = [[w[w1 + i * c + j] for j in range(c)] for i in range(c)]
-        blk = []
-        if simd:                                      # channel pairs interleaved, bias terms last,
-            for i in range(0, c, 2):                  # a spare pair after each convolution row
-                for u, v in zip(rows[i] + [w[mixin + i], w[bias + i], 0.0], rows[i + 1] + [w[mixin + i + 1], w[bias + i + 1], 0.0]):
+        blk, pre = [], []
+        if simd:                                      # channel pairs interleaved, a spare pair after
+            for i in range(0, c, 2):                  # each convolution row; mix-in and bias apart
+                for u, v in zip(rows[i] + [0.0], rows[i + 1] + [0.0]):
                     blk += [u, v]
+                pre += [w[mixin + i], w[mixin + i + 1], w[bias + i], w[bias + i + 1]]
             for i in range(0, c, 2):
                 for u, v in zip(res[i] + [w[b1 + i]], res[i + 1] + [w[b1 + i + 1]]):
                     blk += [u, v]
@@ -69,8 +70,9 @@ def _layers(w, c, simd):
             for i in range(c):
                 blk += [w[b1 + i]] + res[i]
         blocks.append(blk)
+        pres.append(pre)
     head = [w[o + j * HEAD_TAPS + t] for t in range(HEAD_TAPS) for j in range(c)]
-    return blocks, head, w[o + c * HEAD_TAPS], w[o + c * HEAD_TAPS + 1]
+    return (blocks, pres) if simd else blocks, head, w[o + c * HEAD_TAPS], w[o + c * HEAD_TAPS + 1]
 
 
 def pack(w, c, base):
@@ -96,47 +98,81 @@ def pack(w, c, base):
 
 
 # Internal memory of the ADSP-21469 as 32-bit words. A read through DM and one
-# through PM in the same instruction want to be in different blocks, so what
-# nam_a2_simd.asm reaches through PM (weights, layer rings) goes into blocks 3
-# and 1 and everything it reaches through DM stays in block 2 with its scratch.
-BLOCK1 = (0xB2000, 0xBE000)
+# through PM in the same instruction want to be in different blocks.
+# nam_a2_simd.asm's dot loop reads a layer's ring through DM and its weights
+# through PM, and the 1x1 reads the scratch area in block 2 with the weights,
+# so rings and weights go into blocks 3 and 1, a layer's ring never in the
+# block of its weights. The top 16,000 words of block 1 are left for
+# nam_live.asm's delay.
+BLOCK1 = (0xB2000, 0xBA000)
 BLOCK3 = (0xE0000, 0xE8000)
 
 
-def place(w, c, model, x, pools=(BLOCK3, BLOCK1)):
-    """Lay a model out for nam_a2_simd.asm. `model` is the kernel's MODEL and
-    `x` its X. Returns ([(address, words)] to load, [(base, length)] of every
-    ring). The rings are not loaded: nam_reset clears them."""
+def ring_places(k, d):
+    """Places in a layer's ring and how many a write moves on: see the kernel."""
+    return (k - 1) * d + 1, (k - 1) * (d - 1) + 1
+
+
+def place(w, c, model, x=None, pools=(BLOCK3, BLOCK1)):
+    """Lay a model out for nam_a2_simd.asm. `model` is the kernel's MODEL.
+    Returns ([(address, words)] to load, [(base, length)] of every ring). The
+    rings are not loaded: nam_reset clears them."""
     n = len(KERNEL)
-    blocks, head, hbias, scale = _layers(w, c, True)
+    (blocks, pres), head, hbias, scale = _layers(w, c, True)
+    blocks[-1] = blocks[-1] + [0, 0]                  # the loops read one pair ahead
+    lens = [ring_places(k, d)[0] * c for k, d in zip(KERNEL, DILATION)]
+    first = [f2b(v) for v in w[:c] + head] + [0, 0]
+
+    # Which pool gets each layer's ring (its weights go to the other): the
+    # largest rings first, each to the side with more room left, backing up
+    # when something does not fit.
+    cap = [b - a for a, b in pools]
+    order = sorted(range(n), key=lambda i: -lens[i])
+    side = {}
+
+    def fit(j, used):
+        if j == n:
+            return any(u + len(first) + c + 2 <= cp for u, cp in zip(used, cap))
+        i = order[j]
+        need = lens[i] + (lens[i] & 1), len(blocks[i]) + (len(blocks[i]) & 1)
+        for p in sorted((0, 1), key=lambda p: used[p] - cap[p]):
+            u = list(used)
+            u[p] += need[0]
+            u[1 - p] += need[1]
+            if u[0] <= cap[0] and u[1] <= cap[1]:
+                side[i] = p
+                if fit(j + 1, u):
+                    return True
+        return False
+
+    if not fit(0, [0, 0]):
+        raise SystemExit("no room for the model in " + ", ".join(f"{a:#x}..{b - 1:#x}" for a, b in pools))
     free = [list(p) for p in pools]
 
-    def alloc(ln):                                    # even addresses: a pair never straddles a ring's end
-        for p in free:
-            a = p[0] + (p[0] & 1)
-            if a + ln <= p[1]:
-                p[0] = a + ln
+    def alloc(ln, p=None):                            # even addresses: a pair never straddles a ring's end
+        for q in ((p,) if p is not None else (0, 1)):
+            a = free[q][0] + (free[q][0] & 1)
+            if a + ln <= free[q][1]:
+                free[q][0] = a + ln
                 return a
-        raise SystemExit(f"no room for {ln} more words in {', '.join(f'{a:#x}..{b - 1:#x}' for a, b in pools)}")
+        raise SystemExit(f"no room for {ln} more words")
 
-    weights = [f2b(v) for v in w[:c] + head + sum(blocks, [])] + [0, 0]    # the loops read one pair ahead
-    a_rech = alloc(len(weights))
+    rings = {i: alloc(lens[i], side[i]) for i in order}
+    a_w = {i: alloc(len(blocks[i]), 1 - side[i]) for i in order}
+    a_rech = alloc(len(first))
     a_head = a_rech + c
-    a_w = a_head + len(head)
-    lens = [((k - 1) * d + 1) * c for k, d in zip(KERNEL, DILATION)] + [c]   # the last: where the final 1x1 output goes
-    rings = {}
-    for i in sorted(range(n + 1), key=lambda i: -lens[i]):
-        rings[i] = alloc(lens[i])
+    rings[n] = alloc(c)                               # where the final 1x1 output goes
+    lens.append(c)
+    step = [2 + (ring_places(k, d)[1] - 1) * c for k, d in zip(KERNEL, DILATION)] + [2]
     a_table = model + 11
-    hring = a_table + 10 * n + 4
+    table = [rings[0], lens[0], step[0], rings[0], 0]
+    for i, k in enumerate(KERNEL):
+        table += [k * c, -(k * c + 1) & 0xFFFFFFFF, a_w[i]] + [f2b(v) for v in pres[i]]
+        table += [rings[i + 1], lens[i + 1], step[i + 1], rings[i + 1], 0]
+    hring = a_table + len(table)
     hring += hring & 1
-    table, o = [], a_w
-    for i, (k, d) in enumerate(zip(KERNEL, DILATION)):
-        table += [rings[i], lens[i], rings[i], 0, 2 + (d - 1) * c, k - 1, k * c + 2, x - (k - 1) * c, k * c + 3, o]
-        o += len(blocks[i])
-    table += [rings[n], c, rings[n], 0]
     hdr = [c, n, a_table, a_rech, a_head, f2b(scale), hring, HEAD_TAPS * c, hring, 0, f2b(hbias)]
-    return ([(model, hdr + table), (a_rech, weights)],
+    return ([(model, hdr + table), (a_rech, first)] + [(a_w[i], [f2b(v) for v in blocks[i]]) for i in range(n)],
             [(hring, HEAD_TAPS * c)] + [(rings[i], lens[i]) for i in range(n + 1)])
 
 

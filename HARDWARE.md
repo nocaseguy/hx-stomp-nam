@@ -66,7 +66,7 @@ register table (DIR/PIN/SET/CLR for all 8 ports).
 
 | control | mechanism | confidence |
 |---|---|---|
-| footswitches + buttons | read from the XL firmware as direct GPIO; **not so on the unit**: they are behind the footswitch board's controller (I2C) | open |
+| footswitches, buttons, knobs, volume | reported by the footswitch board's controller over I2C; decoded, see "Front panel" below | confirmed on the unit |
 | footswitch LEDs | direct GPIO SET/CLR (0x400F6200/6280) | confirmed |
 | rotary encoder knob(s) | polled GPIO A/B quadrature, CT-timer tick (0x400C3000) | high (no pin-ISR path exists) |
 | volume pot + EXP pedals | polled ADC0 (0x400E3000) + ADC1 (0x400E4000) | confirmed |
@@ -96,8 +96,43 @@ schematic; the read/drive mechanism is settled. See src/input/hx_pinmap.h.
   are in `src/smoke_audio.c`; what each does is not known. GPIO5[18], 6[0]
   and 6[2] are written together from one value in several places (input
   impedance select?).
-- The stock I2C devices, bus 0 address 0x2A and bus 1 address 0x40, are
-  driven as message queues and do not look like converters.
+- **The footswitch board's controller is at 7-bit address 0x2A on I2C bus 0**
+  (it acknowledges there; bus 1 has devices at 0x58 and 0x59). The stock
+  footswitch-light message works: 8 bytes {8, ~sum of the next six, 0, switch,
+  0, red, green, blue 0-100} lit footswitch 1's ring blue. The controller
+  writes to the LPC4350 as a slave (own address register 0x80) when a control
+  changes; see "Front panel" below. Light messages sent 50 ms apart were
+  dropped (only the first took); a quarter of a second apart all arrive.
+- With nothing connected to them, ADC0 channels 1 and 2 read about 0x360 and
+  0x370 and the rest full scale; ADC1 reads the same pins.
+- The LPC4350 images must enable the FPU (CPACR) before any float arithmetic:
+  `startup.c` does. Without it `pedal.c` stopped at its first number.
+
+## Front panel (measured on an HX Stomp, 2026-10-10)
+Every control comes from the footswitch board's controller as a 6-byte write
+to the LPC4350 on I2C bus 0: `06, check, kind, 00, control, value`, where the
+check byte is the inverted sum of the four that follow it.
+
+| kind | meaning | value |
+|---|---|---|
+| 00 | a switch | 01 down or touched, 00 up or let go |
+| 01 | a knob turned | steps since the last message, signed (01 clockwise, FF back; FE, 02 when fast) |
+| 02 | the volume knob, control 00 | position 00-64 (0-100); only sent when it moves |
+| 03 | unknown: on some runs only, value near 24, drifting by one | |
+
+| control | kind 00 (switch) | kind 01 (turn) |
+|---|---|---|
+| left, middle, right knob under the screen | 00, 01, 02 | 00, 01, 02 |
+| upper knob, lower knob | 03, 04 | 03, 04 |
+| PAGE left, VIEW, ACTION, PAGE right | 05, 06, 07, 08 | |
+| footswitch 1, 2, 3 pressed | 09, 0A, 0B | |
+| footswitch 1, 2, 3 touched | 0C, 0D, 0E | |
+
+A footswitch press arrives as touch down, press down, press up, touch up. The
+position of the volume knob at power-up is not sent unasked; how to ask is
+not known yet. `src/pedal.c` uses all of this; `src/usb_mon.h` with
+`tools/usbmon.py` streams the messages to a computer over USB and takes the
+image back to the DFU loader without the Page Right hold.
 
 ## Other peripherals (confirmed present)
 | peripheral | base | use |

@@ -20,7 +20,10 @@
  *   rows 1-9   the words of the last frame read, two to a row (list in
  *              nam_bench.asm). The first, the magic, is green when two
  *              frames in a row agree and the output error is below 1e-4,
- *              red when the error is above, yellow otherwise. */
+ *              red when the error is above, yellow otherwise.
+ * Every frame also goes to the computer over USB as a line of hex words
+ * (src/usb_mon.h, tools/usbmon.py); the command D from there sends the image
+ * back to the DFU loader. */
 #define SMOKE_SHARC_NO_MAIN
 #include "smoke_sharc.c"
 #include "../build/sharc_nam_bench.h"
@@ -29,6 +32,14 @@
 #define ERR_MAX 0x38D1B717u                   /* 1e-4f */
 #define PERIOD 9375u                          /* 450 MHz / 48 kHz */
 #define WORDS NAM_BENCH_WORDS
+#include "dfu.h"
+#include "usb_mon.h"
+static void serve(void) {
+    uint32_t c;
+    usb_poll();
+    if (usb_command(&c) && (c & 0xFF) == 'D') dfu_reboot();
+}
+#define SPAN_POLL() serve()
 #include "smoke_frames.h"
 
 int main(void) {
@@ -39,6 +50,7 @@ int main(void) {
 
     text_start();
     counts();
+    usb_start();
 
     static uint32_t prev[WORDS], w[WORDS];
     for (unsigned frames = 0;;) {
@@ -46,6 +58,9 @@ int main(void) {
         counts();
         if (!got) continue;
         ++frames;
+        usb_puts("bench");
+        for (unsigned i = 0; i < WORDS; ++i) { usb_putc(' '); usb_puthex(w[i], 8); }
+        usb_putc('\n');
         int same = 1;
         for (unsigned i = 0; i < WORDS; ++i) {
             same &= w[i] == prev[i];
