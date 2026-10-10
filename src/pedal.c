@@ -88,7 +88,7 @@ static void scan(unsigned bus, unsigned col) {      /* up to two answering addre
 }
 
 /* A footswitch light, as the stock application asks for it: its message is
- * {0, switch 0-8, 0, red, green, blue 0-100}, sent as length + 2, the inverted
+ * {0, switch 0-3 (0-8 on an XL), 0, red, green, blue 0-100}, sent as length + 2, the inverted
  * sum of the message, then the message. Returns what i2c_write does. */
 static int light(unsigned addr7, unsigned sw, unsigned r, unsigned g, unsigned b) {
     uint8_t m[8] = { 8, 0, 0, (uint8_t)sw, 0, (uint8_t)r, (uint8_t)g, (uint8_t)b };
@@ -119,7 +119,7 @@ int main(void) {
     text_str(0, 2, "I2C", 1);
     scan(0, 4);
     scan(1, 12);
-    for (unsigned sw = 0; sw < 9; ++sw) {     /* light the footswitches, whichever address is theirs */
+    for (unsigned sw = 0; sw < 4; ++sw) {     /* light the footswitches, whichever address is theirs */
         if (light(0x2A, sw, sw & 1 ? 100 : 0, sw & 2 ? 100 : 0, sw & 4 ? 0 : 100) < 0)
             light(0x15, sw, sw & 1 ? 100 : 0, sw & 2 ? 100 : 0, sw & 4 ? 0 : 100);
         spin(5 * MS);

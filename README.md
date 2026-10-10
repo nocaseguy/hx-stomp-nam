@@ -63,9 +63,10 @@ order, if something does not work: `make smoke-lcd`, `smoke-sharc`,
 
 ## Which unit
 
-The work was done on an HX Stomp. The hardware facts it rests on were read
-from the HX Stomp XL firmware and turned out to hold on the HX Stomp, so the
-two evidently share the processor module and audio section; the XL itself has
+The work was done on an HX Stomp. The hardware facts it rests on were first
+read from the HX Stomp XL firmware and then checked against the HX Stomp's
+own: the two use the same SHARC program and, for everything used here, the
+same code on the LPC4350 (`HARDWARE.md` has the details). The XL itself has
 not been tried. The control model in `src/input/` (eight footswitches) is an
 early guess from XL firmware strings and matches neither unit as far as is
 known.

@@ -2,11 +2,15 @@
 
 > **Which unit.** Everything marked as found or working "on the unit" was done
 > on an **HX Stomp** (the three-footswitch model, boards marked P33). The
-> register values and pin numbers were read from the **HX Stomp XL** firmware
-> (v3.80.0, which calls itself P36), and they held on the HX Stomp wherever
-> they were tried, so the two evidently share the processor module and the
-> audio section. Nothing here has been run on an XL, and nothing has been read
-> from the HX Stomp's own firmware.
+> register values and pin numbers were first read from the **HX Stomp XL**
+> firmware (v3.80.0, P36) and then checked against the HX Stomp's own
+> (v3.80.0, P33): the SHARC program and the audio routing data are the same
+> file byte for byte, the bootloader differs only in its splash picture and
+> model name, and in the main application every routine these notes rest on
+> (board and audio pin set-up, SHARC boot, the two I2C devices, the directly
+> read inputs, return to DFU) is identical instruction for instruction. The
+> one difference found: the footswitch-light message takes switch numbers
+> 0-3 on the HX Stomp and 0-8 on the XL. Nothing here has been run on an XL.
 
 
 Derived by reverse-engineering the stock firmware's own bring-up code (clock,
