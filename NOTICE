@@ -1,0 +1,23 @@
+hx-stomp-nam
+Copyright (C) 2026 Derek Bui
+
+This program is free software: you can redistribute it and/or modify it under
+the terms of the GNU General Public License as published by the Free Software
+Foundation, either version 3 of the License, or (at your option) any later
+version. It is distributed WITHOUT ANY WARRANTY; see LICENSE.
+
+Third-party material
+--------------------
+tools/sharc/sasm.py: the SHARC opcode tables are adapted from
+tools/sharc_isa.py of the ghidra-sharc extension
+(https://github.com/roblg/ghidra-sharc), licensed under the Apache License,
+Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). That file
+transcribes them from the Analog Devices "SHARC Processor Programming
+Reference".
+
+Trademarks
+----------
+Line 6, Helix and HX Stomp are trademarks of their owner. This project is not
+affiliated with, endorsed by or supported by Line 6 or Yamaha Guitar Group.
+SHARC is a trademark of Analog Devices. Neural Amp Modeler is the work of its
+own authors; no model files are distributed here.

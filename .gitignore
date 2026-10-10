@@ -1,0 +1,18 @@
+# Original Line 6 firmware and derived binaries (copyrighted, large) are not committed
+*.hxf
+*.hxf.bin
+*.hxf.bin.bin
+*.png
+extracted/
+build/
+*.o
+*.elf
+build/
+__pycache__/
+test/test_biquad
+test/test_engine
+test/test_input
+sim_out/
+test/test_nam_a2
+test/nam_a2_model.h
+test/nam_a2_full.h
