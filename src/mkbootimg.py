@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """mkbootimg.py - wrap a raw Cortex-M binary in an LPC43xx USB-DFU boot header.
 
-Header (little-endian), the form that runs on the HX Stomp XL's boot ROM:
+Header (little-endian), the form that runs on the HX Stomp's boot ROM:
 
     offset 0 : 0xDA          AES not active (0x1A) | no hash (0xC0)
     offset 1 : 0xFF

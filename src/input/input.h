@@ -1,4 +1,7 @@
-/* input.h - HX Stomp XL control model + live monitor (confirm switches/knobs/buttons).
+/* input.h - HX Stomp XL control model + live monitor (a guess from the XL
+ * firmware's strings: eight footswitches. Not what the HX Stomp has, and no
+ * control has been read on a unit yet.)
+ * Original note: control model + live monitor (confirm switches/knobs/buttons).
  *
  * Control set (from stock factory-test strings): 8 footswitches, mode/page
  * buttons, rotary encoder knob(s) with push, expression pedals + volume pot.

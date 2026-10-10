@@ -1,6 +1,6 @@
 # hx-stomp-nam
 
-Independent firmware for the HX Stomp XL that runs a
+Independent firmware for the HX Stomp that runs a
 [Neural Amp Modeler](https://github.com/sdatkinson/neural-amp-modeler) A2
 model on the unit's own DSP. Everything here is written from scratch: a boot
 loader and programs for the ADSP-21469 SHARC, an assembler and simulator for
@@ -13,7 +13,7 @@ unit's own firmware is not touched. You run it at your own risk.
 
 ## What works
 
-On a real HX Stomp XL:
+On a real HX Stomp (the three-footswitch model; see "Which unit" below):
 
 - loading an image over USB with `dfu-util`, and returning to the loader
 - the display
@@ -60,6 +60,15 @@ order, if something does not work: `make smoke-lcd`, `smoke-sharc`,
 | `src/smoke_*.c`, `src/pedal.c` | LPC4350 images that boot the SHARC and show results |
 | `src/` (the rest) | an LPC4350 firmware skeleton: start-up, clocks, display, inputs |
 | `HARDWARE.md`, `tools/sharc/HARDWARE.md` | what the board needs, as found |
+
+## Which unit
+
+The work was done on an HX Stomp. The hardware facts it rests on were read
+from the HX Stomp XL firmware and turned out to hold on the HX Stomp, so the
+two evidently share the processor module and audio section; the XL itself has
+not been tried. The control model in `src/input/` (eight footswitches) is an
+early guess from XL firmware strings and matches neither unit as far as is
+known.
 
 ## Licence
 

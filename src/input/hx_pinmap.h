@@ -1,4 +1,5 @@
-/* hx_pinmap.h - HX Stomp XL board control pin map.
+/* hx_pinmap.h - HX Stomp XL board control pin map (from the XL firmware; never tried, and the
+ * unit this project runs on is an HX Stomp with three footswitches).
  *
  * The stock firmware reads all digital controls via DIRECT GPIO (confirmed:
  * GPIO HAL table with DIR/PIN/SET/CLR for all 8 ports) and reads

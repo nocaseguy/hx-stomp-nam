@@ -1,4 +1,4 @@
-// audio.asm - bring the HX Stomp XL's audio hardware up from the SHARC.
+// audio.asm - bring the HX Stomp's audio hardware up from the SHARC.
 //
 // audio_init does what the stock program does, with its values
 // (tools/sharc/HARDWARE.md), in the order that matters:

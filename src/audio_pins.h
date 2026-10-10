@@ -1,5 +1,5 @@
-/* audio_pins.h - what the LPC4350 has to do for sound to pass on the HX Stomp
- * XL. Include after lpc4350.h. Everything else about the audio hardware is
+/* audio_pins.h - what the LPC4350 has to do for sound to pass on the HX Stomp.
+ * Include after lpc4350.h. Everything else about the audio hardware is
  * the SHARC's business (src/sharc/audio.asm).
  *
  * Found on the unit:

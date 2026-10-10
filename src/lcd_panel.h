@@ -1,4 +1,4 @@
-/* lcd_panel.h - what the HX Stomp XL's panel needs besides the LCD controller,
+/* lcd_panel.h - what the HX Stomp's panel needs besides the LCD controller,
  * shared by smoke_lcd.c and display.c. Include after lpc4350.h.
  *
  * All of it is read from the stock bootloader and works on the unit:

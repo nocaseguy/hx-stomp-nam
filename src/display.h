@@ -1,4 +1,4 @@
-/* display.h - the HX Stomp XL's screen for the main firmware.
+/* display.h - the HX Stomp's screen for the main firmware.
  *
  * The LCD controller scans the panel 240 wide by 320 lines, 16 bpp 5:6:5, and
  * the panel is mounted on its side. This driver presents it the way it is

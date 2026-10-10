@@ -1,4 +1,13 @@
-# HX Stomp XL hardware map
+# HX Stomp hardware map
+
+> **Which unit.** Everything marked as found or working "on the unit" was done
+> on an **HX Stomp** (the three-footswitch model, boards marked P33). The
+> register values and pin numbers were read from the **HX Stomp XL** firmware
+> (v3.80.0, which calls itself P36), and they held on the HX Stomp wherever
+> they were tried, so the two evidently share the processor module and the
+> audio section. Nothing here has been run on an XL, and nothing has been read
+> from the HX Stomp's own firmware.
+
 
 Derived by reverse-engineering the stock firmware's own bring-up code (clock,
 SDRAM, pin mux, GPIO, display) plus public teardowns. **Confirmed** = read from
@@ -53,7 +62,7 @@ register table (DIR/PIN/SET/CLR for all 8 ports).
 
 | control | mechanism | confidence |
 |---|---|---|
-| 8 footswitches + buttons | direct GPIO PIN read (0x400F6100..611C), active-low | confirmed |
+| footswitches + buttons | read from the XL firmware as direct GPIO; **not so on the unit**: they are behind the footswitch board's controller (I2C) | open |
 | footswitch LEDs | direct GPIO SET/CLR (0x400F6200/6280) | confirmed |
 | rotary encoder knob(s) | polled GPIO A/B quadrature, CT-timer tick (0x400C3000) | high (no pin-ISR path exists) |
 | volume pot + EXP pedals | polled ADC0 (0x400E3000) + ADC1 (0x400E4000) | confirmed |

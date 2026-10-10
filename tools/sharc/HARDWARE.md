@@ -1,4 +1,13 @@
-# HX Stomp XL: SHARC-side hardware facts
+# HX Stomp: SHARC-side hardware facts
+
+> **Which unit.** Everything marked as found or working "on the unit" was done
+> on an **HX Stomp** (the three-footswitch model, boards marked P33). The
+> register values and pin numbers were read from the **HX Stomp XL** firmware
+> (v3.80.0, which calls itself P36), and they held on the HX Stomp wherever
+> they were tried, so the two evidently share the processor module and the
+> audio section. Nothing here has been run on an XL, and nothing has been read
+> from the HX Stomp's own firmware.
+
 
 What our own SHARC program has to set up, read from the register values the
 stock program (v3.80.0) writes. Only values are recorded here; the code that
