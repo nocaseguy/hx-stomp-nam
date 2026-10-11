@@ -88,3 +88,37 @@ Not there yet: the volume knob and every other control (nothing reads them),
 choosing a model at run time (it is built into the image), which jack is on
 which port and slot (all inputs are summed to all outputs), and a measured
 figure for how much of the sample period the live loop uses.
+
+## Against NeuralAmpModelerCore
+
+`nam_vs_core.py` runs the same samples through the `render` tool of
+NeuralAmpModelerCore, through `src/dsp/nam_a2.c` and through the SHARC kernel
+in `ssim`, and compares every pair. Measured 2026-10-12 with upstream at
+2563c0f (its Release build: `-Ofast`, samples as doubles, Apple clang 21 on
+arm64), its own `example_models/A2.nam`, and 48,000 samples at 48 kHz, a
+quarter each: a sine sweep 20 Hz - 20 kHz at -12 dBFS, white noise at -20 dBFS
+RMS, a passage of NAM's capture signal, a passage of a guitar DI. Before them
+6,400 samples of silence, more than the 6,347 the model looks back.
+
+The difference from upstream's default build (its A2 fast path), over the
+whole second; "signal/error" is the output's power over the difference's, and
+ESR, NAM's own measure, is the same ratio the other way up:
+
+| | largest | RMS | signal/error | ESR |
+|---|---|---|---|---|
+| **A2-Full (8 channels), `nam_a2_simd.asm`** | 3.4e-7 (-129.3 dBFS) | 3.6e-8 (-149.0 dBFS) | **129.4 dB** | 1.2e-13 |
+| upstream's generic WaveNet, same model | 1.0e-7 | 1.7e-8 | 135.7 dB | 2.7e-14 |
+| `nam_a2.c` without fused multiply-add | 3.1e-7 | 4.0e-8 | 128.4 dB | 1.5e-13 |
+| **A2-Lite (3 channels), `nam_a2.asm`** | 4.6e-7 (-126.7 dBFS) | 4.7e-8 (-146.5 dBFS) | **127.0 dB** | 2.0e-13 |
+| upstream's generic WaveNet, same model | 4.8e-7 | 5.4e-8 | 125.8 dB | 2.6e-13 |
+| `nam_a2.c` without fused multiply-add | 4.0e-7 | 4.6e-8 | 127.3 dB | 1.9e-13 |
+
+By signal, SHARC against upstream: Full 130.8 / 122.2 / 132.2 / 125.1 dB,
+Lite 130.5 / 124.0 / 129.8 / 122.1 dB (sweep, noise, capture signal, DI).
+
+No two of these are equal bit for bit: about one sample in ten has the same
+bits in any pair, upstream's two builds included (18% for Full, 11% for Lite).
+The 8-channel kernel is the one that has run on the unit, where it gave the
+simulator's output exactly; the 3-channel one has only run in the simulator.
+For A2-Lite `--slim` has to be under 0.5: upstream's container takes the first
+submodel whose limit is above the value.

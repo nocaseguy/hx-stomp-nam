@@ -23,6 +23,8 @@ On a real HX Stomp (the three-footswitch model; see "Which unit" below):
   sample (86.9% of a 48 kHz period). Its output is the simulator's bit for
   bit, and within 1.3e-7 of full scale of the C reference in `src/dsp/`
   (same arithmetic, sums taken in a different order)
+- **the same output as NeuralAmpModelerCore, to 129 dB**: see "How close to
+  NAM" below
 - the front panel: every knob, button and footswitch, footswitch touch, and
   the footswitch rings (`HARDWARE.md` has the messages)
 - **a small pedal** (`make pedal`): amp -> three-band equaliser -> delay ->
@@ -75,6 +77,35 @@ driven, so the amp has a LEVEL that starts at +12 dB.
 order, if something does not work: `make smoke-lcd`, `smoke-sharc`,
 `smoke-nam`, `smoke-audio`, `smoke-thru`, `smoke-live`.
 
+## How close to NAM
+
+The kernel was run against the `render` tool of
+[NeuralAmpModelerCore](https://github.com/sdatkinson/NeuralAmpModelerCore)
+(commit 2563c0f, built its own way) on that project's own
+`example_models/A2.nam`: one second at 48 kHz, a quarter each of a sine sweep,
+white noise, a passage of NAM's capture signal and a passage of a guitar DI.
+The difference from NeuralAmpModelerCore's default build:
+
+| | largest | RMS | signal / error | ESR |
+|---|---|---|---|---|
+| **A2-Full, the SHARC kernel on the unit** | 3.4e-7 (-129.3 dBFS) | 3.6e-8 (-149.0 dBFS) | **129.4 dB** | 1.2e-13 |
+| A2-Full, NeuralAmpModelerCore's generic WaveNet | 1.0e-7 | 1.7e-8 | 135.7 dB | 2.7e-14 |
+| **A2-Lite, the SHARC kernel (simulator only)** | 4.6e-7 (-126.7 dBFS) | 4.7e-8 (-146.5 dBFS) | **127.0 dB** | 2.0e-13 |
+| A2-Lite, NeuralAmpModelerCore's generic WaveNet | 4.8e-7 | 5.4e-8 | 125.8 dB | 2.6e-13 |
+
+The largest difference is under four steps of a 24-bit converter. Nothing
+here equals anything else bit for bit, NeuralAmpModelerCore's two builds
+included: floating-point sums taken in a different order round differently.
+The SHARC kernel is about as far from NeuralAmpModelerCore as that library's
+two builds are from each other. ESR is NAM's own measure of error; a good
+capture of an amplifier is around 1e-2 to 1e-3 against the amplifier.
+
+The comparison ran in the simulator, whose output the unit has been shown to
+equal bit for bit for the 8-channel kernel. `tools/sharc/nam_vs_core.py` does
+the measurement and `tools/sharc/README.md` has the rest of the numbers. It
+needs a `render` built from NeuralAmpModelerCore and a 32-bit float WAV file
+of your own.
+
 ## Where things are
 
 | | |
@@ -101,6 +132,27 @@ known.
 
 ## Licence
 
-GPL-3.0-or-later; see `LICENSE` and `NOTICE`. The hardware facts in the
-`HARDWARE.md` files were worked out for interoperability with a device the
-author owns.
+GPL-3.0-or-later; see `LICENSE` and `NOTICE`.
+
+## What is and is not in this repository
+
+- The programs here were written by the author. `NOTICE` lists what was
+  not: an opcode table and two fonts, each under its own free licence. There
+  is no Line 6 code,
+  firmware, firmware update file, preset, picture or sound in it, and none is
+  needed to build or run it.
+- No NAM model is included; you bring your own.
+- Nothing is written to the unit's storage. The images are loaded into RAM
+  through the USB loader in the processor's boot ROM, which the chip's maker
+  documents, and are gone at the next power-cycle. No protection is removed
+  or got round to do that: the loader takes any image.
+- The `HARDWARE.md` files are a record of what the board needs: which pin is
+  which, register values, the form of the messages between the parts. They
+  were worked out, on a unit the author owns, from the unit's own firmware
+  and by trying things on the hardware, for one purpose: to make
+  independently written programs work with that hardware.
+- "Line 6", "Helix" and "HX Stomp" are used only to say which device this
+  runs on. This is not a Line 6 product and Line 6 has no part in it.
+
+If you are at Line 6 or Yamaha Guitar Group and want something here changed
+or discussed, open an issue; it will get an answer.

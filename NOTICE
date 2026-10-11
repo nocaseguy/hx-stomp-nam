@@ -15,6 +15,15 @@ Version 2.0 (https://www.apache.org/licenses/LICENSE-2.0). That file
 transcribes them from the Analog Devices "SHARC Processor Programming
 Reference".
 
+tools/fonts/Jersey15.ttf and tools/fonts/Sixtyfour.ttf, and the glyphs made
+from them in src/ui/font.h: licensed under the SIL Open Font License,
+Version 1.1; each font's copyright notice and the licence are in
+tools/fonts/OFL-Jersey15.txt and tools/fonts/OFL-Sixtyfour.txt.
+
+Neural Amp Modeler: src/dsp/nam_a2.c and the SHARC kernels are independent
+implementations of the A2 WaveNet arithmetic, written from the model file
+format; no NeuralAmpModelerCore source is included.
+
 Trademarks
 ----------
 Line 6, Helix and HX Stomp are trademarks of their owner. This project is not

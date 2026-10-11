@@ -86,7 +86,7 @@ same routine with the numbers worked out. `src/sdram.h` follows it.
 - The panel has an **ILI9341-style controller that must be configured over
   SSP1** before it shows anything: 9-bit frames (bit 8 = data), mode 0, 1 MHz,
   SSEL P1_5, SCK P1_19, MISO P0_0, MOSI P0_1. The sequence is in
-  `smoke_lcd.c`, copied from the bootloader; it ends with sleep-out, a pause,
+  `smoke_lcd.c`, the commands and values the bootloader sends; it ends with sleep-out, a pause,
   display-on.
 - **Backlight: GPIO7[14] (PE_14), active low.** Stock drives it high before
   set-up and low afterwards.
