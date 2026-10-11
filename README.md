@@ -11,6 +11,15 @@ that load them.
 it. It is loaded into RAM over USB and is gone at the next power-cycle; the
 unit's own firmware is not touched. You run it at your own risk.
 
+<p>
+<img src="docs/stomp-on-the-unit.png" width="480" alt="The pedal's screen: NAM A2-FULL, a sunset, and AMP, EQ and DLY blocks">
+<img src="docs/stomp-menu.png" width="480" alt="The pedal's menu">
+</p>
+
+Left: the screen of `make stomp`, fetched from the unit over USB while it
+played (`tools/usbmon.py --shot`). Right: its menu, drawn on a computer by
+`make -C test/sim pedal`.
+
 ## What works
 
 On a real HX Stomp (the three-footswitch model; see "Which unit" below):

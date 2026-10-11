@@ -3,6 +3,7 @@
 *.hxf.bin
 *.hxf.bin.bin
 *.png
+!docs/*.png
 extracted/
 build/
 *.o
