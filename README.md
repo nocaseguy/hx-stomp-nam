@@ -29,6 +29,10 @@ On a real HX Stomp (the three-footswitch model; see "Which unit" below):
   volume, drawn as a chain on the screen, blocks chosen and switched from the
   panel and the footswitches, values on the three knobs. With the amp on the
   SHARC is 89% busy
+- **the same pedal in full colour** (`make stomp`): the 32 MB SDRAM, the
+  screen at 16 bits a pixel, and a UI with a header, a body and a footer
+  that says what each knob does (`src/ui/`). Its pages can be drawn on a
+  computer with no unit: `make -C test/sim pedal`
 - text out and commands in over the USB socket once an image is running
   (`tools/usbmon.py`), including "back to the loader", so only the first load
   after power-up needs the button held
@@ -46,7 +50,8 @@ tests, and a NAM A2 model of your own (none is included).
 ```
 python3 tools/nam2c.py your_model.nam test/nam_a2_full.h --channels 8
 make sharc-test          # assembler, simulator, kernels against the C reference
-make pedal               # -> build/firmware-pedal.dfu
+make pedal               # -> build/firmware-pedal.dfu : chain on a 16-colour screen
+make stomp               # -> build/firmware-stomp.dfu : the same chain, full-colour UI
 ```
 
 Hold Page Right while powering the unit up; it appears as `1fc9:000c`. Then,
@@ -57,9 +62,14 @@ until the volume knob is first moved):
 dfu-util -d 1fc9:000c -a 0 -D build/firmware-pedal.dfu
 ```
 
-Controls are listed at the top of `src/pedal.c`. `python3 tools/usbmon.py`
-(needs pyusb) shows what the controls send; `--send D` returns the unit to
-the loader for the next image.
+Controls are listed at the top of `src/pedal.c`, and for `stomp` at the top
+of `src/ui/pages.h`. `python3 tools/usbmon.py` (needs pyusb) shows what the
+controls send; `--send D` returns the unit to the loader for the next image,
+and under `stomp` `--shot file.png` fetches the screen. If `stomp` shows
+nothing, `make smoke-sdram` tries the SDRAM and the 16-bit screen alone.
+
+An A2 model's output stays some 18 dB under full scale however hard it is
+driven, so the amp has a LEVEL that starts at +12 dB.
 
 `RECOVERY.md` has the details of loading and getting back. Smaller steps, in
 order, if something does not work: `make smoke-lcd`, `smoke-sharc`,
@@ -73,6 +83,8 @@ order, if something does not work: `make smoke-lcd`, `smoke-sharc`,
 | `tools/sharc/` | `sasm` (assembler), `ssim` (simulator), image builders, tests; see its README |
 | `src/dsp/nam_a2.c` | the plain C reference the SHARC kernels are checked against |
 | `src/pedal.c` | the pedal: chain, screen, controls |
+| `src/stomp.c`, `src/ui/` | the pedal with the full-colour UI; `test/sim/pedal_sim.c` draws it on a computer |
+| `tools/mkfont.py`, `tools/fonts/` | the UI's two faces (SIL OFL) and what makes `src/ui/font.h` from them |
 | `src/smoke_*.c` | LPC4350 images that boot the SHARC with one test each and show the result |
 | `src/` (the rest) | an LPC4350 firmware skeleton: start-up, clocks, display, inputs |
 | `HARDWARE.md`, `tools/sharc/HARDWARE.md` | what the board needs, as found |

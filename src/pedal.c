@@ -41,6 +41,7 @@
 #include "i2c_poll.h"
 #include "dfu.h"
 #include "usb_mon.h"
+#include "panel.h"
 
 #ifndef PEDAL_SECONDS
 #define PEDAL_SECONDS 0
@@ -49,37 +50,19 @@
 /* nam_live.asm's parameters. */
 enum { P_GAIN, P_MODEL, P_LEVEL, P_SHOW, P_BAND = 8, P_DTIME = 23, P_DFEED, P_DMIX, P_BAND_USE };
 
-/* What the controller sends, measured on an HX Stomp: length 6, check byte,
- * then kind, 0, control, value.
- *   kind 0  a switch: value 1 down (or touched), 0 up
- *   kind 1  a knob turned: value is the steps, signed
- *   kind 2  the volume knob (control 0): value is its position, 0-100; sent
- *           only when it moves
- *   kind 3  seen on some runs only, value near 0x24; not known */
-enum { K_SWITCH, K_KNOB, K_VOLUME };
-enum {                                          /* controls of kind 0 */
-    SW_KNOB1, SW_KNOB2, SW_KNOB3, SW_UPPER, SW_LOWER, SW_PAGE_L, SW_VIEW, SW_ACTION, SW_PAGE_R,
-    SW_FS1, SW_FS2, SW_FS3, SW_TOUCH1, SW_TOUCH2, SW_TOUCH3
-};
-enum { KN_1, KN_2, KN_3, KN_UPPER, KN_LOWER };  /* controls of kind 1 */
-
-/* The chain. A value is a whole number of `unit`s: tenths where that says 10. */
-enum { B_AMP, B_EQ, B_DELAY, BLOCKS };
-struct value { const char *name; int16_t v, min, max, step; uint8_t tenths; };
-static struct block { const char *name; uint8_t on, values; struct value val[3]; } chain[BLOCKS] = {
-    { "AMP", 1, 1, { { "GAIN", 0, -200, 200, 5, 1 } } },                        /* dB */
-    { "EQ", 1, 3, { { "BASS", 0, -120, 120, 5, 1 }, { "MID", 0, -120, 120, 5, 1 }, { "TREBLE", 0, -120, 120, 5, 1 } } },
-    { "DLY", 0, 3, { { "TIME", 250, 20, 330, 5, 0 }, { "FDBK", 30, 0, 90, 1, 0 }, { "MIX", 30, 0, 100, 1, 0 } } },
-};
-static unsigned chosen = B_AMP;
-static int volume = -1;                         /* not known until the knob moves */
-static float out_level = 0.25f;
-
 static const int8_t fs_block[3] = { B_AMP, B_EQ, B_DELAY };
 static const uint8_t fs_colour[3][3] = { {100, 0, 0}, {0, 100, 0}, {0, 30, 100} };
 
 static void put(unsigned par, float f) { union { float f; uint32_t u; } v = { f }; sharc_message(par, v.u); }
 static float db(float d) { return powf(10.0f, d / 20.0f); }
+
+/* The volume knob and the amp's LEVEL make one number for the SHARC. An A2
+ * model's output stays some 18 dB under full scale however hard it is driven
+ * (measured on the full model with sines), so LEVEL starts above 0 dB. */
+static void level_out(void) {
+    const struct block *k = &chain[B_AMP];
+    put(P_LEVEL, out_level * (k->on ? db((float)k->val[1].v / 10.0f) : 1.0f));
+}
 
 /* One equaliser band for nam_live.asm, from the Audio EQ Cookbook's formulas
  * at 48 kHz: kind 0 low shelf, 1 peak (Q 0.7), 2 high shelf. */
@@ -112,6 +95,7 @@ static void apply(unsigned b) {
     case B_AMP:
         put(P_GAIN, k->on ? db((float)k->val[0].v / 10.0f) : 1.0f);
         sharc_message(P_MODEL, k->on);
+        level_out();
         break;
     case B_EQ:
         band(0, 0, 120.0f, k->on ? (float)k->val[0].v / 10.0f : 0.0f);
@@ -280,7 +264,7 @@ static void control(unsigned kind, unsigned id, unsigned value) {
         volume = value > 100 ? 100 : (int)value;
         float v = (float)volume / 100.0f;
         out_level = v * v;                          /* 0 is silent, 50 is the 0.25 it starts at */
-        put(P_LEVEL, out_level);
+        level_out();
         draw_volume();
     } else if (kind == K_KNOB && id <= KN_3) {
         if (id >= chain[chosen].values) return;

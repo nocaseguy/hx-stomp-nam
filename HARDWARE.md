@@ -29,14 +29,53 @@ the firmware bytes; **inferred** = derived/standard value to verify on hardware.
 - CGU 0x40050000: PLL1_STAT +0x40 (bit0 lock), PLL1_CTRL +0x44, BASE_M4_CLK +0x6C.
 - EMC branch clock via CCU1 (+0x460/+0x468); CREG6 (0x4004312C) EMC clock divider.
 
-## External SDRAM (register map + sequence confirmed; timings standard)
-- EMC 0x40005000, DYCS0 -> **0x28000000**, size >=32 MB (256 Mbit x16).
-- Dynamic regs: Control +0x20, Refresh +0x24, ReadConfig +0x28, tRP/tRAS/... +0x30..+0x50,
-  Config0 +0x100, RasCas0 +0x104.
-- Init: NOP (0x183) -> PALL (0x103) -> MODE (0x083) -> NORMAL (0x000), with an
-  init-refresh window; mode register loaded by a read at 0x28000000 + (mode<<shift).
-- Exact timing values live in a data table not traced; `src/init.c` uses standard
-  LPC4350 32 MB values (TUNE to the actual part).
+## External SDRAM (read from the stock bootloader and updater; works on the unit, 2026-10-10)
+The bootloader keeps its times in nanoseconds in a table; the updater has the
+same routine with the numbers worked out. `src/sdram.h` follows it.
+- EMC 0x40005000, DYCS0 -> **0x28000000, 32 MB**: two 128 Mbit x16 parts on a
+  32-bit data bus (DynamicConfig0 0x4480, then 0x84480 with the buffers on;
+  D0-D31 and four DQM pins are routed). RAS 2, CAS 2 (0x202).
+- Clock: stock takes the core to **204 MHz** first (12 MHz crystal, PLL1 x17,
+  first at 102 MHz then direct) and runs the EMC at half, 102 MHz: CREG6 bit 16
+  set, CCU1 CLK_M4_EMCDIV_CFG (0x40051478) = 0x21, EMCDELAYCLK (0x40086D00) =
+  0x5555. The updater, loaded by the ROM's DFU as our images are, measures the
+  core clock (CGU FREQ_MON) and sets 204 MHz unless it finds it: what the ROM
+  leaves is not said anywhere.
+- Pins (pad value: 0xF0 = no pull-up, fast, input on, no filter, plus the
+  function): CLK0-3 = F5 F0 F5 F0; P1_7-14 F3 (D0-7); P5_4-7, P5_0-3 F2 (D8-15);
+  PD_2-9 F2 (D16-23); PE_5-12 F3 (D24-31); P2_9-13 F3 (A0-4); P1_0-2 F2 (A5-7);
+  P2_8 F3, P2_7 F3, P2_6 F2 (A8-10); P2_2, P2_1, P2_0 F2 (A11-13); P6_8 F1 (A14);
+  P1_6 F3 (WE); P6_4, P6_5 F3 (CAS, RAS); P6_10-12 F3 (DQM1, CKE, DQM0); PE_13 F3
+  (DQM3); PD_0 F2 (DQM2); P6_9 F3 (DYCS0). Which signal each pin carries is
+  from the LPC4350's manual, not from the board.
+- Times in ns, registers +0x30 to +0x58: tRP 18, tRAS 44, tSREX 74, tAPR 10,
+  tDAL 44 (+1), tWR 22, tRC 62, tRFC 62, tXSR 74, tRRD 14, tMRD 22; each
+  register = ns x EMC MHz / 1000, cut to a whole number (at 102 MHz: 1 4 7 1 5
+  2 6 6 7 1 2). Refresh (+0x24) = (15625 x MHz / 1000 + 15) / 16 = 100.
+  ReadConfig (+0x28) = 1.
+- Order: Control 0, clock and pins, Control 1, Config0, RasCas, ReadConfig,
+  times, refresh, NOP (0x183), wait, precharge all (0x103), wait, MODE (0x083),
+  a byte read at 0x28044000 (mode 0x22 << 13: CAS 2, bursts of 4), wait,
+  normal (0x003), Config0 with bit 19.
+- Just before, both programs make P6_7 GPIO5[15] and drive it low; why is not
+  known.
+- `src/init.c`'s set-up (the main firmware's) is none of this and would not
+  work: 16-bit bus, wrong pins, wrong clock select bit.
+- `src/sdram.h` differs from stock in one thing: it leaves the core clock
+  alone, measures it, runs the EMC at half of it and works the times out for
+  that. On the unit (`make smoke-sdram`): **the boot ROM's DFU leaves the core
+  at 96 MHz** (measured against the IRC), so the EMC runs at 48 MHz; the
+  set-up goes through and 768 KB at 0x28000000 pass a write and read-back
+  test, twice over with the words turned. The image's size probe saw no
+  repeat of address 0 up to 64 MB, which does not fit two 128 Mbit parts and
+  is not explained. A write 128 MB up (the next chip select) stopped the
+  processor: don't.
+- The screen runs at 16 bits a pixel from there (`src/screen16.h`: LCD_CTRL
+  bpp 6, bit 8 set; colours come out as named), two buffers shown turn about;
+  `src/stomp.c` draws about 20 frames a second. **Turning the LCD controller
+  off (LcdEn) leaves the panel white** even when it is turned on again with
+  the settings that worked; sending the panel its set-up sequence again
+  (`lcd_panel_setup()`, `lcd_panel_on()`) brings the picture back.
 
 ## Display (working on the unit: `src/smoke_lcd.c`)
 - **LPC4350 built-in LCD controller (LCDC) @ 0x40008000**, parallel RGB, TFT.

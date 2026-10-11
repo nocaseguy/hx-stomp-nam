@@ -131,11 +131,33 @@ build/firmware-smoke-live.dfu: src/smoke_live.c $(SMOKE_AUDIO) build/sharc_nam_l
 
 # The pedal: the model in the path and a monitor for the controls. See src/pedal.c.
 pedal: build/firmware-pedal.dfu
-build/firmware-pedal.dfu: src/pedal.c src/i2c_poll.h src/usb_mon.h $(SMOKE_AUDIO) build/sharc_nam_live.h | build
+build/firmware-pedal.dfu: src/pedal.c src/panel.h src/i2c_poll.h src/usb_mon.h $(SMOKE_AUDIO) build/sharc_nam_live.h | build
 	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/pedal.c src/dfu.c -lm -o build/firmware-pedal.elf
 	$(CROSS)objcopy -O binary build/firmware-pedal.elf build/firmware-pedal.bin
 	python3 src/mkbootimg.py build/firmware-pedal.bin $@
 
+# The pedal in full colour, with the UI of src/ui. See src/stomp.c; the same
+# pages on a computer: make -C test/sim pedal.
+UI = src/panel.h src/ui/fb.h src/ui/font.h src/ui/draw.h src/ui/scene.h src/ui/pages.h
+stomp: build/firmware-stomp.dfu
+build/firmware-stomp.dfu: src/stomp.c src/pedal.c src/sdram.h src/screen16.h $(UI) tools/check_width.py \
+                          src/i2c_poll.h src/usb_mon.h $(SMOKE_AUDIO) build/sharc_nam_live.h | build
+	python3 tools/check_width.py
+	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/stomp.c src/dfu.c -lm -o build/firmware-stomp.elf
+	$(CROSS)size build/firmware-stomp.elf
+	$(CROSS)objcopy -O binary build/firmware-stomp.elf build/firmware-stomp.bin
+	python3 src/mkbootimg.py build/firmware-stomp.bin $@
+
+# Proof of life for what stomp needs first: the SDRAM, and the screen at 16
+# bits a pixel from it. See src/smoke_sdram.c.
+smoke-sdram: build/firmware-smoke-sdram.dfu
+build/firmware-smoke-sdram.dfu: src/smoke_sdram.c src/sdram.h src/screen16.h src/ui/fb.h src/ui/font.h \
+                                src/startup.c src/smoke_lcd.c src/lcd_panel.h src/smoke_text.h src/usb_mon.h src/dfu.c | build
+	$(CROSS)gcc $(CFLAGS) $(LDFLAGS) src/startup.c src/smoke_sdram.c src/dfu.c -o build/firmware-smoke-sdram.elf
+	$(CROSS)size build/firmware-smoke-sdram.elf
+	$(CROSS)objcopy -O binary build/firmware-smoke-sdram.elf build/firmware-smoke-sdram.bin
+	python3 src/mkbootimg.py build/firmware-smoke-sdram.bin $@
+
 clean:
 	rm -rf build
-.PHONY: all backup smoke smoke-bounce smoke-lcd smoke-sharc smoke-nam smoke-stall smoke-audio smoke-thru smoke-live pedal sharc-test clean test
+.PHONY: all backup smoke smoke-bounce smoke-lcd smoke-sharc smoke-nam smoke-stall smoke-audio smoke-thru smoke-live pedal stomp smoke-sdram sharc-test clean test
